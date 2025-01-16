@@ -95,14 +95,23 @@
         .edit-button {
             margin-left: 10px;
         }
-        .modify-button {
+        .modify-button,
+        .delete-button {
             position: absolute;
             top: 15px;
             right: 15px;
             background-color: #007bff;
+            margin-right: 10px;
         }
-        .modify-button:hover {
+        .modify-button:hover,
+        .delete-button:hover {
             background-color: #0056b3;
+        }
+        .delete-button {
+            background-color: #d9534f;
+        }
+        .delete-button:hover {
+            background-color: #c9302c;
         }
     </style>
 </head>
@@ -122,9 +131,25 @@
 
     <script>
         const countdownModules = [];
+        const MAX_COUNTDOWNS = 3;
+
+        function loadCountdowns() {
+            const savedCountdowns = JSON.parse(localStorage.getItem('countdowns')) || [];
+            savedCountdowns.forEach(countdown => {
+                addCountdownFromData(countdown.title, countdown.targetDate, countdown.remainingTime);
+            });
+        }
+
+        function saveCountdowns() {
+            localStorage.setItem('countdowns', JSON.stringify(countdownModules.map(module => ({
+                title: module.element.querySelector('.countdown-title').textContent,
+                targetDate: module.element.querySelector('.edit-form input[type="date"]').value,
+                remainingTime: getRemainingTime(module)
+            }))));
+        }
 
         function addCountdown() {
-            if (countdownModules.length >= 3) {
+            if (countdownModules.length >= MAX_COUNTDOWNS) {
                 alert("最多只能添加3个倒计时");
                 return;
             }
@@ -137,16 +162,23 @@
                 return;
             }
 
-            const targetDate = new Date(targetDateInput).getTime();
+            // Set default time to UTC+8 00:00:00
+            const targetDate = new Date(targetDateInput + 'T00:00:00+08:00').getTime();
             const now = new Date().getTime();
             let totalSeconds = Math.max(0, Math.floor((targetDate - now) / 1000));
 
+            addCountdownFromData(title, targetDateInput, totalSeconds);
+            saveCountdowns();
+        }
+
+        function addCountdownFromData(title, targetDateInput, remainingTime) {
             const countdownModule = document.createElement('div');
             countdownModule.className = 'countdown-module';
             countdownModule.innerHTML = `
                 <div class="countdown-title">${title}</div>
-                <span class="countdown-time">${formatTime(Math.floor(totalSeconds / 86400), "天")} ${formatTime(Math.floor((totalSeconds % 86400) / 3600), "小时")} ${formatTime(Math.floor((totalSeconds % 3600) / 60), "分钟")} ${formatTime(totalSeconds % 60, "秒")}</span>
+                <span class="countdown-time">${formatTime(Math.floor(remainingTime / 86400), "天")} ${formatTime(Math.floor((remainingTime % 86400) / 3600), "小时")} ${formatTime(Math.floor((remainingTime % 3600) / 60), "分钟")} ${formatTime(remainingTime % 60, "秒")}</span>
                 <button class="modify-button" onclick="editCountdown(this)">修改</button>
+                <button class="delete-button" onclick="deleteCountdown(this)">删除</button>
                 <div class="edit-form">
                     <input type="text" placeholder="新的标题" value="${title}">
                     <input type="date" value="${targetDateInput}">
@@ -159,8 +191,6 @@
 
             const countdownContainer = document.getElementById('countdownContainer');
             countdownContainer.appendChild(countdownModule);
-
-            let remainingTime = totalSeconds;
 
             const intervalId = setInterval(() => {
                 remainingTime--;
@@ -198,7 +228,8 @@
                 return;
             }
 
-            const newTargetDate = new Date(newTargetDateInput).getTime();
+            // Set default time to UTC+8 00:00:00
+            const newTargetDate = new Date(newTargetDateInput + 'T00:00:00+08:00').getTime();
             const now = new Date().getTime();
             let totalSeconds = Math.max(0, Math.floor((newTargetDate - now) / 1000));
 
@@ -228,6 +259,7 @@
 
             countdownModules[countdownModules.findIndex(module => module.element === countdownModule)] = { element: countdownModule, intervalId };
             editForm.style.display = 'none';
+            saveCountdowns();
         }
 
         function cancelEdit(button) {
@@ -236,9 +268,31 @@
             editForm.style.display = 'none';
         }
 
+        function deleteCountdown(button) {
+            const countdownModule = button.parentElement;
+            const index = countdownModules.findIndex(module => module.element === countdownModule);
+            if (index !== -1) {
+                clearInterval(countdownModules[index].intervalId);
+                countdownModules.splice(index, 1);
+                countdownModule.remove();
+                saveCountdowns();
+            }
+        }
+
         function formatTime(time, unit) {
             return time > 0 ? `${time}${unit}` : '';
         }
+
+        function getRemainingTime(module) {
+            const currentTime = new Date().getTime();
+            const targetTime = new Date(module.element.querySelector('.edit-form input[type="date"]').value + 'T00:00:00+08:00').getTime();
+            return Math.max(0, Math.floor((targetTime - currentTime) / 1000));
+        }
+
+        window.onload = loadCountdowns;
     </script>
 </body>
 </html>
+
+
+
